@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>系统通知 · Liquid Glass</title>
+  <style>
+    /* 极简重置 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* 梦幻液态背景 (让玻璃的折射效果拉满) */
+    body {
+      min-height: 100vh;
+      background: #f0f2f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bg-light {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }
+    
+    .bg-light div {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.85;
+      animation: floatLight 15s infinite alternate ease-in-out;
+    }
+    .b1 { width: 400px; height: 400px; background: #a2c2ff; top: -10%; left: -10%; }
+    .b2 { width: 450px; height: 450px; background: #ffb6c1; bottom: -15%; right: -10%; animation-duration: 18s; }
+    .b3 { width: 300px; height: 300px; background: #a8ffe1; top: 40%; left: 30%; animation-duration: 12s; }
+
+    @keyframes floatLight {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(50px, 80px) scale(1.2); }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #090a0f; }
+      .bg-light div { opacity: 0.4; }
+    }
+
+    /* ================= 核心：液态玻璃通知弹窗 ================= */
+    .glass-notification {
+      width: 100%;
+      max-width: 380px;
+      /* 极致纯粹的透明玻璃感 */
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(40px) saturate(200%);
+      -webkit-backdrop-filter: blur(40px) saturate(200%);
+      border-radius: 32px;
+      
+      /* 极简的折射白边与柔和的高光阴影 */
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 
+        0 24px 48px -12px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      
+      position: relative;
+      z-index: 10;
+      padding: 20px 20px 24px;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .glass-notification {
+        background: rgba(25, 28, 35, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      }
+    }
+
+    /* 顶部栏 (时间与状态) */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1e293b;
+      opacity: 0.7;
+      margin-bottom: 16px;
+      padding: 0 6px;
+      letter-spacing: 0.3px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .top-bar { color: #e2e8f0; }
+    }
+    .live-time {
+      font-variant-numeric: tabular-nums;
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    /* 正常显示区域 */
+    .notify-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: opacity 0.25s;
+    }
+
+    /* 指南针图标 (精致小巧) */
+    .compass {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      color: #0f172a;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.08));
+      animation: float 4s ease-in-out infinite;
+      transition: all 0.3s;
+    }
+    @media (prefers-color-scheme: dark) { .compass { color: #f8fafc; } }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    .spin-compass { animation: spinCompass 1s cubic-bezier(0.4, 0, 0.2, 1) infinite !important; }
+    @keyframes spinCompass { 100% { transform: rotate(360deg); } }
+
+    /* 核心 ID 胶囊 */
+    .id-pill {
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.6);
+      padding: 8px 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+      margin-bottom: 12px;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    @media (prefers-color-scheme: dark) {
+      .id-pill { color: #f8fafc; background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1); }
+    }
+
+    /* 极简网格标签 (无滑动) */
+    .tag-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .tag {
+      font-size: 11px;
+      font-weight: 500;
+      color: #475569;
+      background: rgba(255, 255, 255, 0.4);
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    @media (prefers-color-scheme: dark) {
+      .tag { color: #cbd5e1; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
+    }
+
+    /* 拦截大字 */
+    .reject-text {
+      font-size: 18px;
+      font-weight: 800;
+      color: #ef4444;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+      text-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+    }
+
+    /* 终端日志 (极短) */
+    .mini-log {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 12px;
+      padding: 10px;
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 10px;
+      color: #64748b;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.3);
+      text-align: left;
+    }
+    @media (prefers-color-scheme: dark) {
+      .mini-log { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.05); }
+    }
+
+    /* 弹窗按钮组 (iOS 风格横排) */
+    .action-row {
+      display: flex;
+      width: 100%;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 14px 0;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.4);
+      color: #0f172a;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    
+    .btn:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .btn-primary {
+      background: #0f172a;
+      color: #ffffff;
+      border-color: transparent;
+    }
+    .btn-primary:active {
+      background: #1e293b;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .btn { background: rgba(255,255,255,0.1); color: #f8fafc; border-color: rgba(255,255,255,0.15); }
+      .btn-primary { background: #f8fafc; color: #0f172a; }
+      .btn-primary:active { background: #cbd5e1; }
+    }
+
+    /* ================= 加载状态 (替换下半部分，无滑动) ================= */
+    .loading-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 0 32px;
+      width: 100%;
+    }
+
+    /* 状态类：隐藏正常内容，显示加载内容 */
+    .is-loading .notify-content { display: none; }
+    .is-loading .loading-state { display: flex; animation: fadeIn 0.2s ease; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* 精致的加载小圆盘 */
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-top-color: #0f172a;
+      animation: spinDisk 0.8s linear infinite;
+      margin-bottom: 20px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .spinner { border-color: rgba(255,255,255,0.1); border-top-color: #f8fafc; }
+    }
+    @keyframes spinDisk { 100% { transform: rotate(360deg); } }
+
+    /* 进度条区域 */
+    .progress-box {
+      width: 85%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    @media (prefers-color-scheme: dark) { .progress-meta { color: #f8fafc; } }
+    
+    .timer-text {
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.4);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    }
+    @media (prefers-color-scheme: dark) {
+      .progress-track { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #0f172a;
+      border-radius: 10px;
+      transition: width 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 8px rgba(15, 23, 42, 0.4);
+    }
+    @media (prefers-color-scheme: dark) {
+      .progress-fill { background: #f8fafc; box-shadow: 0 0 8px rgba(248, 250, 252, 0.4); }
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- 梦幻极光背景 -->
+  <div class="bg-light">
+    <div class="b1"></div>
+    <div class="b2"></div>
+    <div class="b3"></div>
+  </div>
+
+  <!-- 默认带 is-loading 状态，进页面先加载 -->
+  <div class="glass-notification is-loading" id="notificationCard">
+    
+    <!-- 顶部固定状态栏 -->
+    <div class="top-bar">
+      <div>系统安全检测</div>
+      <div class="live-time" id="liveTime">00:00</div>
+    </div>
+
+    <!-- 正常显示内容 -->
+    <div class="notify-content" id="notifyContent">
+      
+      <!-- 图标 -->
+      <svg class="compass" id="compassIcon" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="100" cy="100" r="82" stroke="currentColor" stroke-width="16" fill="none" />
+        <polygon points="140,60 82,86 60,140 118,114" fill="currentColor" />
+        <circle cx="100" cy="100" r="16" fill="rgba(255,255,255,0.8)" />
+      </svg>
+
+      <!-- ID -->
+      <div class="id-pill" id="androidId">检测中...</div>
+
+      <!-- 紧凑的标签组 -->
+      <div class="tag-grid" id="deviceTags"></div>
+
+      <!-- 核心提示字 -->
+      <div class="reject-text">暂不支持</div>
+
+      <!-- 极简日志 -->
+      <div class="mini-log" id="miniLog"></div>
+
+      <!-- 按钮组 -->
+      <div class="action-row">
+        <button class="btn btn-primary" id="refreshBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.65-6.35" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
+          重试
+        </button>
+        <a href="https://wwbaq.lanzouu.com/ztm" target="_blank" rel="noopener noreferrer" class="btn">
+          其他产品
+        </a>
+      </div>
+
+    </div>
+
+    <!-- 加载状态 -->
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <div class="progress-box">
+        <div class="progress-meta">
+          <div id="progressText">0%</div>
+          <div class="timer-text" id="timerText">0.0s</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // DOM 获取
+    const notificationCard = document.getElementById('notificationCard');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const deviceTags = document.getElementById('deviceTags');
+    const compassIcon = document.getElementById('compassIcon');
+    const miniLog = document.getElementById('miniLog');
+    const androidIdEl = document.getElementById('androidId');
+    const liveTimeEl = document.getElementById('liveTime');
+    
+    const progressText = document.getElementById('progressText');
+    const timerText = document.getElementById('timerText');
+    const progressFill = document.getElementById('progressFill');
+
+    // ============ 1. 实时时钟 ============
+    function updateTime() {
+      const now = new Date();
+      liveTimeEl.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    }
+    updateTime();
+    setInterval(updateTime, 1000);
+
+    // ============ 2. 进度条随机引擎 ============
+    let progressInterval = null;
+
+    function startLoadingAnimation() {
+      if (progressInterval) clearInterval(progressInterval);
+      progressFill.style.width = '0%';
+      progressText.textContent = '0%';
+      timerText.textContent = '0.0s';
+      
+      const totalDuration = Math.floor(Math.random() * 2000) + 3000; // 3~5秒随机
+      const startTime = Date.now();
+      const personality = Math.floor(Math.random() * 3) + 1; // 随机性格
+
+      progressInterval = setInterval(() => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        timerText.textContent = `${(elapsed / 1000).toFixed(1)}s`;
+
+        let percent = (elapsed / totalDuration) * 100;
+
+        if (elapsed >= totalDuration) {
+          clearInterval(progressInterval);
+          progressFill.style.width = '100%';
+          progressText.textContent = '100%';
+          
+          setTimeout(() => {
+            notificationCard.classList.remove('is-loading');
+            detectDeviceInfo(); 
+            simulateLogs();     
+            compassIcon.classList.add('spin-compass');
+            setTimeout(() => compassIcon.classList.remove('spin-compass'), 1000);
+          }, 200);
+          return;
+        }
+
+        let displayPercent = percent;
+        if (personality === 1) { // 先快后慢
+          displayPercent = Math.pow(percent / 100, 0.4) * 100;
+          if (percent > 80 && percent < 95) displayPercent = Math.min(displayPercent, 98 + (Math.random() * 1.5));
+        } else if (personality === 2) { // 先慢后快
+          displayPercent = Math.pow(percent / 100, 2.5) * 100;
+        } else if (personality === 3) { // 波浪
+          displayPercent = percent + Math.sin(percent * 0.2) * 5;
+        }
+
+        displayPercent = Math.min(Math.max(displayPercent, 0), 99);
+        progressFill.style.width = `${displayPercent}%`;
+        progressText.textContent = `${Math.floor(displayPercent)}%`;
+
+      }, 50); 
+    }
+
+    // ============ 3. 设备信息检测 ============
+    function generateDeviceFingerprint() {
+      const ua = navigator.userAgent;
+      const platform = navigator.platform;
+      const cores = navigator.hardwareConcurrency || 'unknown';
+      const screen = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
+      const raw = `${ua}|${platform}|${cores}|${screen}|${navigator.language}`;
+      
+      let hash = 5381;
+      for (let i = 0; i < raw.length; i++) hash = ((hash << 5) + hash) + raw.charCodeAt(i);
+      let hex = (hash >>> 0).toString(16).toUpperCase();
+      while (hex.length < 12) hex += Math.floor(Math.random() * 16).toString(16).toUpperCase();
+      return `FP-${hex.slice(0, 6)}-${hex.slice(6, 10)}`;
+    }
+
+    function detectDeviceInfo() {
+      androidIdEl.textContent = generateDeviceFingerprint();
+
+      const ua = navigator.userAgent;
+      let os = 'Unknown', model = 'Device', screen = `${window.screen.width}×${window.screen.height}`;
+
+      if (/android/i.test(ua)) {
+        os = 'Android';
+        const match = ua.match(/Android\s([\d.]+)/i);
+        if(match) os += ' ' + match[1];
+        const modelMatch = ua.match(/;\s*([^;)]+)\s+Build/i);
+        model = modelMatch ? modelMatch[1].trim() : 'Android';
+      } else if (/iphone|ipad|ipod/i.test(ua)) {
+        const match = ua.match(/OS\s([\d_]+)/i);
+        os = match ? `iOS ${match[1].replace(/_/g, '.')}` : 'iOS';
+        model = ua.match(/iPhone|iPad|iPod/i)[0];
+      } else if (/windows/i.test(ua)) {
+        os = 'Windows'; model = 'PC';
+      } else if (/mac/i.test(ua)) {
+        os = 'macOS'; model = 'Mac';
+      }
+
+      // 使用紧凑的标签代替长文本
+      deviceTags.innerHTML = `
+        <span class="tag">${model}</span>
+        <span class="tag">${os}</span>
+        <span class="tag">${screen}</span>
+        <span class="tag">${navigator.language || 'zh-CN'}</span>
+      `;
+    }
+
+    // ============ 4. 极简日志 ============
+    function simulateLogs() {
+      miniLog.innerHTML = `> [SYS] 校验指纹: ${androidIdEl.textContent}<br>> <span style="color:#ef4444;">[WARN] 未知设备环境，已拦截。</span>`;
+    }
+
+    // ============ 5. 交互控制 ============
+    refreshBtn.addEventListener('click', () => {
+      if (notificationCard.classList.contains('is-loading')) return;
+      notificationCard.classList.add('is-loading');
+      startLoadingAnimation();
+    });
+
+    // 页面初次加载
+    window.addEventListener('load', () => {
+      setTimeout(startLoadingAnimation, 100);
+    });
+
+  </script>
+</body>
+</html>
